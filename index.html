@@ -524,13 +524,22 @@ main { padding: 0 15px; }
     connection.textContent = 'YUKLANMOQDA';
 
     try {
-      const data = await getJSON(
-        API + '/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=50&page=1&sparkline=false&price_change_percentage=24h'
+      const pages = [1, 2, 3, 4, 5];
+      const batches = await Promise.all(
+        pages.map(page => getJSON(
+          API + '/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=250&page=' + page + '&sparkline=false&price_change_percentage=24h'
+        ))
       );
 
-      if (!Array.isArray(data) || !data.length) {
-        throw new Error('Bozor ma’lumotlari topilmadi');
-      }
+      const unique = new Map();
+      batches.flat().forEach(coin => {
+        if (coin && coin.id && !unique.has(coin.id)) {
+          unique.set(coin.id, coin);
+        }
+      });
+
+      const data = [...unique.values()];
+      if (!data.length) throw new Error('Bozor ma’lumotlari topilmadi');
 
       coins = data;
       connection.textContent = 'JONLI BOZOR';
@@ -538,24 +547,22 @@ main { padding: 0 15px; }
       const btc = coins.find(c => c.id === 'bitcoin');
       if (btc) {
         document.getElementById('btcPrice').textContent = usd(btc.current_price);
-        const change = btc.price_change_percentage_24h;
+        const change = Number(btc.price_change_percentage_24h || 0);
         const changeEl = document.getElementById('btcChange');
         changeEl.className = 'change ' + changeClass(change);
-        changeEl.textContent = `${change >= 0 ? '▲ +' : '▼ '}${Number(change || 0).toFixed(2)}% · 24 SOAT`;
+        changeEl.textContent = `${change >= 0 ? '▲ +' : '▼ '}${change.toFixed(2)}% · 24 SOAT`;
       }
 
       document.getElementById('updatedAt').textContent =
         'Yangilandi: ' + new Date().toLocaleTimeString('uz-UZ');
 
       document.getElementById('coinCount').textContent = coins.length + ' ta aktiv';
-
       renderCoins();
     } catch (error) {
-      connection.textContent = 'ALOQA XATOSI';
-      if (!coins.length) {
-        list.innerHTML = '<div class="message">Haqiqiy narxlarni olish imkoni bo‘lmadi.<br>Internetni tekshiring yoki birozdan keyin qayta urinib ko‘ring.<br><br>' +
-          String(error.message).replace(/</g, '&lt;') + '</div>';
-      }
+      console.error('Bozorni yuklash xatosi:', error);
+      connection.textContent = 'API XATOSI';
+      document.getElementById('updatedAt').textContent =
+        'Ma’lumot yuklanmadi. Birozdan keyin qayta urinib ko‘ring.';
     } finally {
       busy = false;
     }
@@ -754,29 +761,52 @@ main { padding: 0 15px; }
       const page = button.dataset.page;
 
       if (page === 'alerts') {
-        tg?.showAlert?.('Narx ogohlantirishlarini botdagi /alert buyrug‘i orqali sozlashingiz mumkin.');
-        if (!tg) alert('Narx ogohlantirishlari uchun botdagi /alert buyrug‘idan foydalaning.');
+        const message =
+          'Narx ogohlantirishlari bot orqali boshqariladi.\n\n' +
+          '/alert btc above 95000 — narx oshsa xabar\n' +
+          '/myalerts — alertlar ro‘yxati\n' +
+          '/delalert 1 — alertni o‘chirish';
+
+        if (tg && typeof tg.showPopup === 'function') {
+          tg.showPopup({
+            title: 'Narx alertlari',
+            message,
+            buttons: [{ type: 'ok', text: 'Tushunarli' }]
+          });
+        } else {
+          alert(message);
+        }
         return;
       }
 
       if (page === 'info') {
-        tg?.showPopup?.({
-          title:'Crypto Ticker',
-          message:'Kriptovalyuta narxlari CoinGecko bozor API manbasidan olinadi. Narxlar kechikishi mumkin.',
-          buttons:[{type:'ok', text:'Tushunarli'}]
-        });
+        const message =
+          'Crypto Ticker narxlarni CoinGecko API manbasidan oladi. ' +
+          'Narxlar kechikishi yoki API cheklovi sabab vaqtincha ko‘rinmasligi mumkin.';
+
+        if (tg && typeof tg.showPopup === 'function') {
+          tg.showPopup({
+            title: 'Crypto Ticker',
+            message,
+            buttons: [{ type: 'ok', text: 'Tushunarli' }]
+          });
+        } else {
+          alert(message);
+        }
         return;
       }
 
       filter = page === 'watchlist' ? 'watchlist' : 'all';
+
       document.querySelectorAll('.nav-item').forEach(b =>
         b.classList.toggle('active', b === button)
       );
       document.querySelectorAll('.filter').forEach(b =>
         b.classList.toggle('active', b.dataset.filter === filter)
       );
+
       renderCoins();
-      window.scrollTo({top:0, behavior:'smooth'});
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     });
   });
 
