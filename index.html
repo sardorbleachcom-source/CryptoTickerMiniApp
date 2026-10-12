@@ -466,6 +466,29 @@ main { padding: 0 15px; }
   </div>
 </main>
 
+
+<section id="alertsPanel" style="display:none;padding:18px 16px 100px;max-width:760px;margin:auto">
+  <h2>♧ Narx alertlari</h2>
+  <p style="opacity:.75">Coin nomi, masalan: bitcoin yoki btc</p>
+  <form id="alertForm" style="display:grid;gap:12px">
+    <input id="alertCoin" class="search" placeholder="Coin nomi yoki belgisi" required>
+    <input id="alertTarget" class="search" type="number" min="0.000001" step="any" placeholder="Maqsad narxi (USD)" required>
+    <select id="alertDirection" class="search">
+      <option value="above">Narx yuqoriga yetsa</option>
+      <option value="below">Narx pastga tushsa</option>
+    </select>
+    <button class="refresh" type="submit">＋ Alert yaratish</button>
+  </form>
+  <p id="alertStatus" role="status" style="margin:14px 0"></p>
+  <div style="display:flex;align-items:center;justify-content:space-between">
+    <h3>Mening alertlarim</h3>
+    <button id="refreshAlerts" class="refresh" type="button">↻ Yangilash</button>
+  </div>
+  <div id="alertList" class="coin-list">
+    <div class="message">Alertlar yuklanmoqda...</div>
+  </div>
+</section>
+
 <nav class="bottom-nav">
   <button class="nav-item active" data-page="market"><b>⌁</b>Bozor</button>
   <button class="nav-item" data-page="watchlist"><b>☆</b>Saqlangan</button>
@@ -756,26 +779,120 @@ main { padding: 0 15px; }
     loadChart(chartCoin, chartDays);
   });
 
+
+  const ALERT_API = 'https://assigned-carnival-daily-sustainable.trycloudflare.com';
+  const alertsPanel = document.getElementById('alertsPanel');
+  const alertStatus = document.getElementById('alertStatus');
+  const alertList = document.getElementById('alertList');
+
+  async function alertRequest(path = '', options = {}) {
+    const initData = tg?.initData || '';
+    if (!initData) {
+      throw new Error('Mini App’ni Telegram bot ichidan oching.');
+    }
+
+    const response = await fetch(ALERT_API + '/api/alerts' + path, {
+      ...options,
+      headers: {
+        'X-Telegram-Init-Data': initData,
+        ...(options.body ? {'Content-Type': 'application/json'} : {}),
+        ...(options.headers || {})
+      }
+    });
+
+    if (!response.ok) {
+      const message = await response.text();
+      throw new Error(message || ('Server xatosi: ' + response.status));
+    }
+    return response.status === 204 ? null : response.json();
+  }
+
+  async function loadAlerts() {
+    alertList.innerHTML = '<div class="message">Alertlar yuklanmoqda...</div>';
+    try {
+      const alerts = await alertRequest();
+      if (!alerts.length) {
+        alertList.innerHTML = '<div class="message">Hozircha alert yo‘q.</div>';
+        return;
+      }
+
+      alertList.innerHTML = alerts.map(a => `
+        <article class="coin">
+          <div class="coin-name">
+            <strong>${escapeHTML(a.coin)}</strong>
+            <small>${a.direction === 'above' ? 'Narx yuqoriga yetsa' : 'Narx pastga tushsa'}</small>
+          </div>
+          <div class="coin-price">
+            <strong>$${number(a.target)}</strong>
+            <small>ID: ${Number(a.id)}</small>
+          </div>
+          <button class="refresh" type="button" data-delete-alert="${Number(a.id)}">O‘chirish</button>
+        </article>
+      `).join('');
+    } catch (error) {
+      alertList.innerHTML = '<div class="message">Alertlarni yuklab bo‘lmadi.</div>';
+      alertStatus.textContent = error.message;
+    }
+  }
+
+  document.getElementById('alertForm').addEventListener('submit', async event => {
+    event.preventDefault();
+    const coin = document.getElementById('alertCoin').value.trim();
+    const target = Number(document.getElementById('alertTarget').value);
+    const direction = document.getElementById('alertDirection').value;
+
+    if (!coin || !Number.isFinite(target) || target <= 0) {
+      alertStatus.textContent = 'Coin va musbat narx kiriting.';
+      return;
+    }
+
+    alertStatus.textContent = 'Alert yaratilmoqda...';
+    try {
+      const result = await alertRequest('', {
+        method: 'POST',
+        body: JSON.stringify({coin, target, direction})
+      });
+      alertStatus.textContent = result.message || 'Alert yaratildi.';
+      document.getElementById('alertForm').reset();
+      await loadAlerts();
+    } catch (error) {
+      alertStatus.textContent = 'Xato: ' + error.message;
+    }
+  });
+
+  document.getElementById('refreshAlerts').addEventListener('click', loadAlerts);
+
+  alertList.addEventListener('click', async event => {
+    const button = event.target.closest('[data-delete-alert]');
+    if (!button) return;
+
+    const id = button.dataset.deleteAlert;
+    if (!confirm('Ushbu alertni o‘chirmoqchimisiz?')) return;
+
+    button.disabled = true;
+    try {
+      await alertRequest('/' + encodeURIComponent(id), {method: 'DELETE'});
+      alertStatus.textContent = 'Alert o‘chirildi.';
+      await loadAlerts();
+    } catch (error) {
+      alertStatus.textContent = 'Xato: ' + error.message;
+      button.disabled = false;
+    }
+  });
+
+
   document.querySelectorAll('.nav-item').forEach(button => {
     button.addEventListener('click', () => {
       const page = button.dataset.page;
 
       if (page === 'alerts') {
-        const message =
-          'Narx ogohlantirishlari bot orqali boshqariladi.\n\n' +
-          '/alert btc above 95000 — narx oshsa xabar\n' +
-          '/myalerts — alertlar ro‘yxati\n' +
-          '/delalert 1 — alertni o‘chirish';
-
-        if (tg && typeof tg.showPopup === 'function') {
-          tg.showPopup({
-            title: 'Narx alertlari',
-            message,
-            buttons: [{ type: 'ok', text: 'Tushunarli' }]
-          });
-        } else {
-          alert(message);
-        }
+        document.querySelectorAll('.nav-item').forEach(b =>
+          b.classList.toggle('active', b === button)
+        );
+        document.querySelector('main').style.display = 'none';
+        alertsPanel.style.display = 'block';
+        window.scrollTo({top: 0, behavior: 'smooth'});
+        loadAlerts();
         return;
       }
 
@@ -796,6 +913,8 @@ main { padding: 0 15px; }
         return;
       }
 
+      alertsPanel.style.display = 'none';
+      document.querySelector('main').style.display = 'block';
       filter = page === 'watchlist' ? 'watchlist' : 'all';
 
       document.querySelectorAll('.nav-item').forEach(b =>
