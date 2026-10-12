@@ -1,0 +1,790 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#050806">
+<title>Crypto Ticker</title>
+
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+:root {
+  color-scheme: dark;
+  --bg: #050806;
+  --panel: #0b110d;
+  --panel2: #101a13;
+  --green: #39ff72;
+  --green2: #13c957;
+  --text: #f1f7f2;
+  --muted: #84958a;
+  --border: rgba(57,255,114,.15);
+  --red: #ff5d70;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  padding: 0 0 calc(86px + env(safe-area-inset-bottom));
+  background:
+    radial-gradient(ellipse at 50% 0%, rgba(25,130,55,.13), transparent 48%),
+    var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  min-height: 100vh;
+}
+
+button, input { font: inherit; }
+button { cursor: pointer; }
+
+header {
+  padding: 22px 18px 15px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+
+.logo {
+  width: 43px;
+  height: 43px;
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
+  background: linear-gradient(145deg, #163c22, #08110b);
+  border: 1px solid #287c42;
+  color: var(--green);
+  font-size: 25px;
+  box-shadow: 0 0 22px #18e45b20;
+  animation: glow 3s ease-in-out infinite;
+}
+
+.brand h1 {
+  font-size: 18px;
+  margin: 0;
+  letter-spacing: -.5px;
+}
+
+.brand p {
+  margin: 4px 0 0;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.status {
+  font-size: 10px;
+  color: var(--green);
+  background: #0b2112;
+  border: 1px solid #1d6734;
+  border-radius: 20px;
+  padding: 7px 9px;
+  white-space: nowrap;
+}
+
+.dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  background: var(--green);
+  border-radius: 50%;
+  margin-right: 5px;
+  box-shadow: 0 0 9px var(--green);
+  animation: blink 1.5s infinite;
+}
+
+main { padding: 0 15px; }
+
+.hero {
+  margin: 8px 0 17px;
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: 23px;
+  background:
+    radial-gradient(circle at 85% 25%, #1a9c3b20, transparent 38%),
+    linear-gradient(145deg, #101b13, #080d09);
+  position: relative;
+  overflow: hidden;
+  animation: appear .5s ease both;
+}
+
+.hero::after {
+  content: "";
+  position: absolute;
+  width: 160px;
+  height: 160px;
+  right: -65px;
+  bottom: -95px;
+  border: 1px solid #39ff7230;
+  border-radius: 50%;
+  box-shadow: 0 0 0 15px #39ff7208, 0 0 0 30px #39ff7205;
+}
+
+.eyebrow {
+  font-size: 11px;
+  color: var(--muted);
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+}
+
+.total {
+  font-size: 31px;
+  font-weight: 800;
+  letter-spacing: -1.4px;
+  margin: 10px 0 8px;
+}
+
+.total span { color: var(--green); }
+
+.hero-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.market-caption {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.refresh {
+  color: var(--green);
+  background: #12251a;
+  border: 1px solid #245b35;
+  border-radius: 10px;
+  padding: 9px 12px;
+  font-size: 11px;
+  position: relative;
+  z-index: 1;
+}
+
+.section-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 23px 2px 13px;
+}
+
+.section-title h2 {
+  font-size: 15px;
+  margin: 0;
+}
+
+.section-title span {
+  font-size: 10px;
+  color: var(--muted);
+}
+
+.search {
+  width: 100%;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 14px;
+  padding: 14px 15px;
+  outline: none;
+  margin-bottom: 12px;
+  transition: border-color .2s, box-shadow .2s;
+}
+
+.search:focus {
+  border-color: #39ff7270;
+  box-shadow: 0 0 0 3px #39ff7210;
+}
+
+.search::placeholder { color: #69786d; }
+
+.filters {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 13px;
+}
+
+.filter {
+  border: 1px solid #1b2a20;
+  background: #0a100c;
+  color: var(--muted);
+  padding: 8px 13px;
+  border-radius: 10px;
+  font-size: 11px;
+}
+
+.filter.active {
+  background: #12321c;
+  color: var(--green);
+  border-color: #267a3d;
+}
+
+.coin-list { display: grid; gap: 9px; }
+
+.coin {
+  display: grid;
+  grid-template-columns: 40px minmax(0,1fr) auto;
+  gap: 11px;
+  align-items: center;
+  padding: 13px 12px;
+  border: 1px solid #17231a;
+  border-radius: 16px;
+  background: linear-gradient(115deg, #0c130e, #080c09);
+  transition: transform .2s, border-color .2s, background .2s;
+  animation: appear .35s ease both;
+}
+
+.coin:active { transform: scale(.985); }
+.coin:hover { border-color: #39ff7245; }
+
+.coin img {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: #18221a;
+}
+
+.coin-name { min-width: 0; }
+
+.coin-name strong {
+  display: block;
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.coin-name small {
+  display: block;
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.coin-price { text-align: right; }
+
+.coin-price strong {
+  display: block;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.change {
+  display: inline-block;
+  margin-top: 5px;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.up { color: var(--green); }
+.down { color: var(--red); }
+
+.favorite {
+  background: transparent;
+  border: 0;
+  color: #647268;
+  padding: 5px;
+  font-size: 18px;
+}
+
+.favorite.selected { color: var(--green); }
+
+.chart-card {
+  background: linear-gradient(145deg, #0e1710, #080d09);
+  border: 1px solid var(--border);
+  border-radius: 19px;
+  padding: 15px;
+  margin-top: 20px;
+  animation: appear .4s ease both;
+}
+
+.chart-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.chart-head strong { font-size: 14px; }
+.chart-head span { font-size: 10px; color: var(--muted); }
+
+.chart-wrap { height: 190px; position: relative; }
+
+.periods { display: flex; gap: 7px; }
+
+.period {
+  background: #101a13;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 6px 9px;
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.period.active {
+  color: var(--green);
+  border-color: #267a3d;
+  background: #15301d;
+}
+
+.message {
+  padding: 22px 10px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.bottom-nav {
+  position: fixed;
+  z-index: 5;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 10px 9px calc(10px + env(safe-area-inset-bottom));
+  background: rgba(5,8,6,.94);
+  backdrop-filter: blur(18px);
+  border-top: 1px solid #1b2a20;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+}
+
+.nav-item {
+  background: transparent;
+  border: 0;
+  color: #6e7d72;
+  display: grid;
+  justify-items: center;
+  gap: 5px;
+  padding: 5px 2px;
+  font-size: 10px;
+}
+
+.nav-item b { font-size: 19px; font-weight: 400; }
+
+.nav-item.active { color: var(--green); }
+
+.footer {
+  text-align: center;
+  color: #526057;
+  font-size: 9px;
+  margin: 24px 0 10px;
+}
+
+@keyframes glow {
+  0%,100% { box-shadow: 0 0 12px #18e45b18; }
+  50% { box-shadow: 0 0 24px #18e45b42; }
+}
+
+@keyframes blink {
+  0%,100% { opacity: 1; }
+  50% { opacity: .4; }
+}
+
+@keyframes appear {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    transition-duration: .01ms !important;
+  }
+}
+</style>
+</head>
+
+<body>
+<header>
+  <div class="brand">
+    <div class="logo">₿</div>
+    <div>
+      <h1>Crypto <span style="color:var(--green)">Ticker</span></h1>
+      <p>REAL-TIME CRYPTO MARKET</p>
+    </div>
+  </div>
+  <div class="status"><i class="dot"></i><span id="connection">ULANMOQDA</span></div>
+</header>
+
+<main>
+  <section class="hero">
+    <div class="eyebrow">Kripto bozori · USD</div>
+    <div class="total" id="btcPrice">Yuklanmoqda...</div>
+    <div class="hero-bottom">
+      <div>
+        <div id="btcChange" class="change">BTC / USDT</div>
+        <div class="market-caption" id="updatedAt">Bozor ma’lumotlari olinmoqda</div>
+      </div>
+      <button class="refresh" id="refreshBtn">↻ Yangilash</button>
+    </div>
+  </section>
+
+  <div class="section-title">
+    <h2>📊 Bozor</h2>
+    <span id="coinCount">Coinlar yuklanmoqda</span>
+  </div>
+
+  <input id="search" class="search" placeholder="⌕  Coin nomi yoki belgisi..." autocomplete="off">
+
+  <div class="filters">
+    <button class="filter active" data-filter="all">Barchasi</button>
+    <button class="filter" data-filter="gainers">📈 O‘sayotganlar</button>
+    <button class="filter" data-filter="losers">📉 Pasayayotganlar</button>
+    <button class="filter" data-filter="watchlist">★ Saqlangan</button>
+  </div>
+
+  <div id="coinList" class="coin-list">
+    <div class="message">Haqiqiy bozor narxlari yuklanmoqda...</div>
+  </div>
+
+  <section class="chart-card">
+    <div class="chart-head">
+      <div>
+        <strong id="chartTitle">₿ Bitcoin grafigi</strong>
+        <div style="margin-top:5px"><span id="chartSubtitle">Narx tarixi</span></div>
+      </div>
+      <div class="periods">
+        <button class="period" data-days="1">1K</button>
+        <button class="period active" data-days="7">7K</button>
+        <button class="period" data-days="30">30K</button>
+      </div>
+    </div>
+    <div class="chart-wrap">
+      <canvas id="priceChart"></canvas>
+    </div>
+    <div id="chartMessage" class="message">Grafik ma’lumotlari yuklanmoqda...</div>
+  </section>
+
+  <div class="footer">
+    MA’LUMOT MANBAI: COINGECKO · USD<br>
+    Narxlar bozor ma’lumotlari yangilanishiga bog‘liq.
+  </div>
+</main>
+
+<nav class="bottom-nav">
+  <button class="nav-item active" data-page="market"><b>⌁</b>Bozor</button>
+  <button class="nav-item" data-page="watchlist"><b>☆</b>Saqlangan</button>
+  <button class="nav-item" data-page="alerts"><b>♧</b>Alertlar</button>
+  <button class="nav-item" data-page="info"><b>◎</b>Ma’lumot</button>
+</nav>
+
+<script>
+(() => {
+  const tg = window.Telegram?.WebApp;
+  if (tg) {
+    tg.ready();
+    tg.expand();
+    tg.setHeaderColor('#050806');
+    tg.setBackgroundColor('#050806');
+  }
+
+  const API = 'https://api.coingecko.com/api/v3';
+  const list = document.getElementById('coinList');
+  const search = document.getElementById('search');
+  const connection = document.getElementById('connection');
+
+  let coins = [];
+  let filter = 'all';
+  let chart;
+  let chartCoin = 'bitcoin';
+  let chartDays = 7;
+  let busy = false;
+
+  let favorites = new Set();
+  try {
+    favorites = new Set(JSON.parse(localStorage.getItem('crypto-ticker-favs') || '[]'));
+  } catch (_) {}
+
+  const number = (n) => {
+    if (n == null || !Number.isFinite(Number(n))) return '—';
+    return Number(n).toLocaleString('en-US', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: Number(n) < 1 ? 6 : 2
+    });
+  };
+
+  const usd = (n) => n == null ? '—' : '$' + number(n);
+
+  const changeClass = (n) => Number(n) >= 0 ? 'up' : 'down';
+
+  async function getJSON(url) {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error('API javobi: ' + response.status);
+    return response.json();
+  }
+
+  async function loadMarket() {
+    if (busy) return;
+    busy = true;
+    connection.textContent = 'YUKLANMOQDA';
+
+    try {
+      const data = await getJSON(
+        API + '/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=50&page=1&sparkline=false&price_change_percentage=24h'
+      );
+
+      if (!Array.isArray(data) || !data.length) {
+        throw new Error('Bozor ma’lumotlari topilmadi');
+      }
+
+      coins = data;
+      connection.textContent = 'JONLI BOZOR';
+
+      const btc = coins.find(c => c.id === 'bitcoin');
+      if (btc) {
+        document.getElementById('btcPrice').textContent = usd(btc.current_price);
+        const change = btc.price_change_percentage_24h;
+        const changeEl = document.getElementById('btcChange');
+        changeEl.className = 'change ' + changeClass(change);
+        changeEl.textContent = `${change >= 0 ? '▲ +' : '▼ '}${Number(change || 0).toFixed(2)}% · 24 SOAT`;
+      }
+
+      document.getElementById('updatedAt').textContent =
+        'Yangilandi: ' + new Date().toLocaleTimeString('uz-UZ');
+
+      document.getElementById('coinCount').textContent = coins.length + ' ta aktiv';
+
+      renderCoins();
+    } catch (error) {
+      connection.textContent = 'ALOQA XATOSI';
+      if (!coins.length) {
+        list.innerHTML = '<div class="message">Haqiqiy narxlarni olish imkoni bo‘lmadi.<br>Internetni tekshiring yoki birozdan keyin qayta urinib ko‘ring.<br><br>' +
+          String(error.message).replace(/</g, '&lt;') + '</div>';
+      }
+    } finally {
+      busy = false;
+    }
+  }
+
+  function renderCoins() {
+    const query = search.value.trim().toLowerCase();
+
+    let shown = coins.filter(c =>
+      c.name.toLowerCase().includes(query) ||
+      c.symbol.toLowerCase().includes(query)
+    );
+
+    if (filter === 'gainers') {
+      shown = shown.filter(c => Number(c.price_change_percentage_24h) > 0)
+        .sort((a,b) => b.price_change_percentage_24h - a.price_change_percentage_24h);
+    } else if (filter === 'losers') {
+      shown = shown.filter(c => Number(c.price_change_percentage_24h) < 0)
+        .sort((a,b) => a.price_change_percentage_24h - b.price_change_percentage_24h);
+    } else if (filter === 'watchlist') {
+      shown = shown.filter(c => favorites.has(c.id));
+    }
+
+    if (!shown.length) {
+      list.innerHTML = '<div class="message">Bu yerda coin topilmadi.</div>';
+      return;
+    }
+
+    list.innerHTML = shown.map((c, i) => {
+      const pct = Number(c.price_change_percentage_24h || 0);
+      const fav = favorites.has(c.id);
+
+      return `
+        <article class="coin" data-coin="${c.id}" style="animation-delay:${Math.min(i,8)*25}ms">
+          <img src="${c.image}" alt="" loading="lazy" onerror="this.style.visibility='hidden'">
+          <div class="coin-name">
+            <strong>${escapeHTML(c.name)}</strong>
+            <small>${c.symbol.toUpperCase()} · #${c.market_cap_rank || '—'}</small>
+          </div>
+          <div class="coin-price">
+            <strong>${usd(c.current_price)}</strong>
+            <span class="change ${changeClass(pct)}">${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%</span>
+          </div>
+          <button class="favorite ${fav ? 'selected' : ''}" data-fav="${c.id}" aria-label="Saqlash">${fav ? '★' : '☆'}</button>
+        </article>`;
+    }).join('');
+  }
+
+  function escapeHTML(value) {
+    return String(value).replace(/[&<>"']/g, ch => ({
+      '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'
+    })[ch]);
+  }
+
+  async function loadChart(id, days) {
+    chartCoin = id;
+    chartDays = days;
+
+    const coin = coins.find(c => c.id === id);
+    document.getElementById('chartTitle').textContent =
+      (coin ? coin.name : id) + ' grafigi';
+
+    document.getElementById('chartMessage').textContent = 'Grafik yuklanmoqda...';
+
+    try {
+      const data = await getJSON(
+        `${API}/coins/${encodeURIComponent(id)}/market_chart?vs_currency=usd&days=${days}`
+      );
+
+      const prices = data.prices || [];
+      if (!prices.length) throw new Error('Grafik ma’lumotlari mavjud emas');
+
+      const labels = prices.map(p => {
+        const d = new Date(p[0]);
+        return days === 1
+          ? d.toLocaleTimeString('uz-UZ', {hour:'2-digit', minute:'2-digit'})
+          : d.toLocaleDateString('uz-UZ', {day:'2-digit', month:'2-digit'});
+      });
+
+      const values = prices.map(p => p[1]);
+      const ctx = document.getElementById('priceChart').getContext('2d');
+      const gradient = ctx.createLinearGradient(0, 0, 0, 220);
+      gradient.addColorStop(0, 'rgba(57,255,114,.24)');
+      gradient.addColorStop(1, 'rgba(57,255,114,0)');
+
+      if (chart) chart.destroy();
+
+      chart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [{
+            data: values,
+            borderColor: '#39ff72',
+            backgroundColor: gradient,
+            borderWidth: 2,
+            fill: true,
+            tension: .32,
+            pointRadius: 0,
+            pointHitRadius: 12
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          animation: {duration: 650},
+          plugins: {
+            legend: {display:false},
+            tooltip: {
+              displayColors:false,
+              backgroundColor:'#101a13',
+              borderColor:'#245b35',
+              borderWidth:1,
+              titleColor:'#9aa99d',
+              bodyColor:'#39ff72',
+              callbacks: {
+                label: context => ' ' + usd(context.parsed.y)
+              }
+            }
+          },
+          scales: {
+            x: {
+              grid: {display:false},
+              ticks: {color:'#69786d', maxTicksLimit:5, maxRotation:0}
+            },
+            y: {
+              position:'right',
+              grid: {color:'rgba(132,149,138,.10)'},
+              ticks: {
+                color:'#84958a',
+                maxTicksLimit:5,
+                callback: value => '$' + Number(value).toLocaleString('en-US')
+              }
+            }
+          }
+        }
+      });
+
+      document.getElementById('chartSubtitle').textContent =
+        days === 1 ? 'Oxirgi 24 soat' : 'Oxirgi ' + days + ' kun';
+      document.getElementById('chartMessage').textContent =
+        'Manba: CoinGecko · USD';
+    } catch (error) {
+      document.getElementById('chartMessage').textContent =
+        'Grafikni yuklab bo‘lmadi. Birozdan keyin qayta urinib ko‘ring.';
+    }
+  }
+
+  list.addEventListener('click', event => {
+    const favButton = event.target.closest('[data-fav]');
+    if (favButton) {
+      const id = favButton.dataset.fav;
+      favorites.has(id) ? favorites.delete(id) : favorites.add(id);
+      localStorage.setItem('crypto-ticker-favs', JSON.stringify([...favorites]));
+      renderCoins();
+      return;
+    }
+
+    const card = event.target.closest('[data-coin]');
+    if (card) {
+      loadChart(card.dataset.coin, chartDays);
+      document.querySelector('.chart-card').scrollIntoView({
+        behavior:'smooth', block:'center'
+      });
+    }
+  });
+
+  search.addEventListener('input', renderCoins);
+
+  document.querySelectorAll('.filter').forEach(button => {
+    button.addEventListener('click', () => {
+      filter = button.dataset.filter;
+      document.querySelectorAll('.filter').forEach(b =>
+        b.classList.toggle('active', b === button)
+      );
+      renderCoins();
+    });
+  });
+
+  document.querySelectorAll('.period').forEach(button => {
+    button.addEventListener('click', () => {
+      document.querySelectorAll('.period').forEach(b =>
+        b.classList.toggle('active', b === button)
+      );
+      loadChart(chartCoin, Number(button.dataset.days));
+    });
+  });
+
+  document.getElementById('refreshBtn').addEventListener('click', () => {
+    loadMarket();
+    loadChart(chartCoin, chartDays);
+  });
+
+  document.querySelectorAll('.nav-item').forEach(button => {
+    button.addEventListener('click', () => {
+      const page = button.dataset.page;
+
+      if (page === 'alerts') {
+        tg?.showAlert?.('Narx ogohlantirishlarini botdagi /alert buyrug‘i orqali sozlashingiz mumkin.');
+        if (!tg) alert('Narx ogohlantirishlari uchun botdagi /alert buyrug‘idan foydalaning.');
+        return;
+      }
+
+      if (page === 'info') {
+        tg?.showPopup?.({
+          title:'Crypto Ticker',
+          message:'Kriptovalyuta narxlari CoinGecko bozor API manbasidan olinadi. Narxlar kechikishi mumkin.',
+          buttons:[{type:'ok', text:'Tushunarli'}]
+        });
+        return;
+      }
+
+      filter = page === 'watchlist' ? 'watchlist' : 'all';
+      document.querySelectorAll('.nav-item').forEach(b =>
+        b.classList.toggle('active', b === button)
+      );
+      document.querySelectorAll('.filter').forEach(b =>
+        b.classList.toggle('active', b.dataset.filter === filter)
+      );
+      renderCoins();
+      window.scrollTo({top:0, behavior:'smooth'});
+    });
+  });
+
+  loadMarket().then(() => loadChart('bitcoin', 7));
+
+  // API limitlariga ehtiyotkorlik bilan 60 soniyada yangilash.
+  setInterval(loadMarket, 60000);
+})();
+</script>
+</body>
+</html>
