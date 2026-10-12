@@ -396,6 +396,17 @@ main { padding: 0 15px; }
     transition-duration: .01ms !important;
   }
 }
+
+.delete-modal-backdrop{position:fixed;inset:0;z-index:9999;display:none;align-items:center;justify-content:center;padding:22px;background:#000b;backdrop-filter:blur(8px)}
+.delete-modal-backdrop.visible{display:flex}
+.delete-modal{width:100%;max-width:360px;padding:22px;border-radius:20px;background:#101713;border:1px solid #354439;color:#f1f7f2;box-shadow:0 20px 70px #0009}
+.delete-modal h3{margin:0 0 9px;font-size:18px}
+.delete-modal p{margin:0 0 20px;color:#aab8ae;line-height:1.5}
+.delete-modal-actions{display:flex;gap:10px}
+.delete-modal-actions button{flex:1;min-height:42px;border-radius:11px;font:inherit;cursor:pointer}
+.delete-modal-cancel{background:#202a23;border:1px solid #354439;color:#e5eee7}
+.delete-modal-confirm{background:#d83d48;border:1px solid #d83d48;color:white;font-weight:600}
+
 </style>
 </head>
 
@@ -488,6 +499,18 @@ main { padding: 0 15px; }
     <div class="message">Alertlar yuklanmoqda...</div>
   </div>
 </section>
+
+
+<div id="deleteModalBackdrop" class="delete-modal-backdrop">
+  <div class="delete-modal" role="dialog" aria-modal="true" aria-labelledby="deleteModalTitle">
+    <h3 id="deleteModalTitle">Alertni o‘chirish</h3>
+    <p>Ushbu alertni o‘chirmoqchimisiz?</p>
+    <div class="delete-modal-actions">
+      <button id="cancelDeleteAlert" class="delete-modal-cancel" type="button">Bekor qilish</button>
+      <button id="confirmDeleteAlert" class="delete-modal-confirm" type="button">O‘chirish</button>
+    </div>
+  </div>
+</div>
 
 <nav class="bottom-nav">
   <button class="nav-item active" data-page="market"><b>⌁</b>Bozor</button>
@@ -862,12 +885,38 @@ main { padding: 0 15px; }
 
   document.getElementById('refreshAlerts').addEventListener('click', loadAlerts);
 
+
+  const deleteModalBackdrop = document.getElementById('deleteModalBackdrop');
+  const cancelDeleteAlert = document.getElementById('cancelDeleteAlert');
+  const confirmDeleteAlert = document.getElementById('confirmDeleteAlert');
+
+  function showDeleteModal() {
+    deleteModalBackdrop.classList.add('visible');
+    return new Promise(resolve => {
+      const close = value => {
+        deleteModalBackdrop.classList.remove('visible');
+        cancelDeleteAlert.removeEventListener('click', cancel);
+        confirmDeleteAlert.removeEventListener('click', confirm);
+        deleteModalBackdrop.removeEventListener('click', outside);
+        resolve(value);
+      };
+      const cancel = () => close(false);
+      const confirm = () => close(true);
+      const outside = e => {
+        if (e.target === deleteModalBackdrop) close(false);
+      };
+      cancelDeleteAlert.addEventListener('click', cancel);
+      confirmDeleteAlert.addEventListener('click', confirm);
+      deleteModalBackdrop.addEventListener('click', outside);
+    });
+  }
+
   alertList.addEventListener('click', async event => {
     const button = event.target.closest('[data-delete-alert]');
     if (!button) return;
 
     const id = button.dataset.deleteAlert;
-    if (!confirm('Ushbu alertni o‘chirmoqchimisiz?')) return;
+    if (!(await showDeleteModal())) return;
 
     button.disabled = true;
     try {
